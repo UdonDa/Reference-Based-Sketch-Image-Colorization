@@ -189,12 +189,13 @@ class SCFT(nn.Module):
         spatial_c_i = torch.reshape(c_i.unsqueeze(-1), (bs,c,int(hw**0.5), int(hw**0.5))) #  [1, 448, 32, 32]
         
         # Similarity-Based Triplet Loss
-        a = wk_vr[0, :, :]
-        b = wk_vr[1:, :, :]
+        a = wk_vr[0, :, :].detach().clone()
+        b = wk_vr[1:, :, :].detach().clone()
         wk_vr_neg = torch.cat((b, a.unsqueeze(0)))
         alpha_negative = F.softmax(torch.matmul(wq_vs, wk_vr_neg) / self.coef, dim=-1)
+        v_negative = torch.matmul(alpha_negative, wv_vr)
         
-        L_tr = F.relu(-alpha + alpha_negative + self.gamma).mean()
+        L_tr = F.relu(-v_asta + v_negative + self.gamma).mean()
         
         return spatial_c_i, L_tr
         
@@ -274,8 +275,8 @@ class Decoder(nn.Module):
         
 
 if __name__ == '__main__':
-    I_s = torch.randn(2,1,256,256)
-    I_r = torch.randn(2,3,256,256)
+    I_s = torch.randn(4,1,256,256)
+    I_r = torch.randn(4,3,256,256)
     
     G = Generator()
     G(I_r, I_s)

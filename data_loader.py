@@ -90,6 +90,7 @@ class Dataset(data.Dataset):
         return len(self.ids)
 
 # def TPS(x):
+#     Pseudo original implementation... But, I do not believe this is correct.
 #     c,h,w = x.size()
 #     x = x.numpy()
 #     common = np.random.rand(4, 2)
@@ -102,7 +103,9 @@ class Dataset(data.Dataset):
 
 
 def TPS(x):
-    
+    """
+    http://www.mech.tohoku-gakuin.ac.jp/rde/contents/course/robotics/coordtrans.html
+    """
     def affine_transform(x, theta):
         theta = theta.view(-1, 2, 3)
         # grid = F.affine_grid(theta, x.size(), align_corners=True)

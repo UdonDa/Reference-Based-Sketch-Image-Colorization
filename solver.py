@@ -183,9 +183,11 @@ class Solver(object):
                 g_loss_rec = torch.mean(torch.abs(I_fake - I_gt)) # Eq.(6)
                 
                 g_loss_prec, g_loss_style = self.VGGLoss(I_gt, I_fake)
+                g_loss_prec *= config.lambda_perc
+                g_loss_style *= config.lambda_style
 
                 # Backward and optimize.
-                g_loss = g_loss_fake + config.lambda_rec * g_loss_rec + config.lambda_tr * g_loss_tr + config.lambda_perc * g_loss_prec + config.lambda_style * g_loss_style
+                g_loss = g_loss_fake + config.lambda_rec * g_loss_rec + config.lambda_tr * g_loss_tr + g_loss_prec + g_loss_style
                 self.reset_grad()
                 g_loss.backward()
                 self.g_optimizer.step()

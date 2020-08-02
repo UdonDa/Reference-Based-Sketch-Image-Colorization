@@ -21,19 +21,17 @@ class VGGLoss(nn.Module):
         loss_dict = {}
 
         feat_real = self.extractor(real)
-        feat_real = self.extractor(fake)
+        feat_fake = self.extractor(fake)
 
         L_prec = 0.
         L_style = 0.
         for i in range(len(feat_real)):
-            L_prec += self.l1(feat_real[i], feat_real[i])
-            L_style += self.l1(gram_matrix(feat_real[i]), gram_matrix(feat_real[i]))
+            L_prec += self.l1(feat_real[i], feat_fake[i])
+            L_style += self.l1(gram_matrix(feat_real[i]), gram_matrix(feat_fake[i]))
 
         L_prec = L_prec.mean()
         L_style = L_style.mean()
-        
 
-        
         return L_prec, L_style
     
     

@@ -21,3 +21,19 @@ class VGG16FeatureExtractor(nn.Module):
             func = getattr(self, 'enc_{:d}'.format(i + 1))
             results.append(func(results[-1]))
         return results[1:]
+    
+    
+
+if __name__ == '__main__':
+    import torch
+    x = torch.randn(1,3,256,256)
+    
+    model = VGG16FeatureExtractor()
+    out = model(x)
+    
+    
+    print(len(out))
+    for o in out:
+        print(o.size())
+        
+    print(model.enc_1)
