@@ -27,8 +27,8 @@ def main(config):
 
     if config.mode == 'train':
         solver.train()
-    elif config.mode == 'test':
-        solver.test()
+    # elif config.mode == 'test':
+    #     solver.test()
 
 
 if __name__ == '__main__':
