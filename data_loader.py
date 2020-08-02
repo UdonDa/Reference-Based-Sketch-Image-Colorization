@@ -78,8 +78,8 @@ class Dataset(data.Dataset):
         
         if random.random() <= 0.9:
             # I_r = TPS(I_gt)
-            # I_r = TPS(I_gt.unsqueeze(0)).squeeze()
-            I_r = I_gt.clone()
+            I_r = TPS(I_gt.unsqueeze(0)).squeeze()
+            # I_r = I_gt.clone()
         else:
             I_r = torch.zeros(I_gt.size())
 
@@ -142,7 +142,7 @@ def get_loader(crop_size=256, image_size=266, batch_size=16, dataset='CelebA', m
         T.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
         T.Resize((crop_size, crop_size), interpolation=Image.LANCZOS),
         T.ToTensor(),
-        # T.RandomErasing(p=0.9, value=1., scale=(0.02, 0.1))
+        # T.RandomErasing(p=0.9, value=1., scale=(0.02, 0.1)) # For experimental
     ])
     
     transform_original = T.Compose([
