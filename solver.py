@@ -11,7 +11,7 @@ import datetime
 from sys import exit
 
 from vgg import VGG16FeatureExtractor
-from loss import 
+from loss import VGGLoss
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -62,6 +62,10 @@ class Solver(object):
         
         self.G = nn.DataParallel(self.G)
         self.D = nn.DataParallel(self.D)
+        
+        self.VGGLoss = VGGLoss().eval()
+        self.VGGLoss.cuda()
+        self.VGGLoss = nn.DataParallel(self.VGGLoss)
         
     def adv_loss(self, logits, target):
         assert target in [1, 0]
@@ -171,15 +175,17 @@ class Solver(object):
                 # =================================================================================== #
                 I_gt.requires_grad_(requires_grad=False)
                 # if (i+1) % config.n_critic == 0:
-                I_fake = self.G(I_r, I_s)
+                I_fake, g_loss_tr = self.G(I_r, I_s, IsGTrain=True)
                 out = self.D(I_fake)
                 # g_loss_fake = criterion(out, real_target)
                 g_loss_fake = self.adv_loss(out, 1)
                 
                 g_loss_rec = torch.mean(torch.abs(I_fake - I_gt)) # Eq.(6)
+                
+                g_loss_prec, g_loss_style = self.VGGLoss(I_gt, I_fake)
 
                 # Backward and optimize.
-                g_loss = g_loss_fake + config.lambda_rec * g_loss_rec
+                g_loss = g_loss_fake + config.lambda_rec * g_loss_rec + config.lambda_tr * g_loss_tr + config.lambda_perc * g_loss_prec + config.lambda_style * g_loss_style
                 self.reset_grad()
                 g_loss.backward()
                 self.g_optimizer.step()
@@ -187,6 +193,9 @@ class Solver(object):
                 # Logging.
                 loss['G/loss_fake'] = g_loss_fake.item()
                 loss['G/loss_rec'] = g_loss_rec.item()
+                loss['G/loss_tr'] = g_loss_tr.item()
+                loss['G/loss_prec'] = g_loss_prec.item()
+                loss['G/loss_style'] = g_loss_style.item()
                     
             # =================================================================================== #
             #                                 4. Miscellaneous                                    #

@@ -45,17 +45,20 @@ class Generator(nn.Module):
         self.decoder = Decoder(in_channel=channel_1x1)
         self.activation = nn.Tanh()
     
-    def forward(self, I_r, I_s):
+    def forward(self, I_r, I_s, IsGTrain=False):
         v_r = self.enc_r(I_r)
         v_s, I_s_f1_9 = self.enc_s(I_s)
         
-        f_scft = self.scft(v_r, v_s)
+        f_scft, L_tr = self.scft(v_r, v_s)
         
         f_encoded = self.conv1x1(f_scft)
         
         f_encoded = self.resblocks(f_encoded) + f_encoded # [1,512,32,32]
 
         f_out = self.decoder(f_encoded, I_s_f1_9)
+        
+        if IsGTrain:
+            return self.activation(f_out), L_tr
         
         return self.activation(f_out)
 
@@ -168,6 +171,8 @@ class SCFT(nn.Module):
         self.W_k = nn.Parameter(torch.randn(d_channel, d_channel)) # [448, 448]
         self.W_q = nn.Parameter(torch.randn(d_channel, d_channel)) # [448, 448]
         self.coef = d_channel ** .5
+        
+        self.gamma = 12.
     
     def forward(self, V_r, V_s):
         
@@ -183,7 +188,15 @@ class SCFT(nn.Module):
         bs,c,hw = c_i.size()
         spatial_c_i = torch.reshape(c_i.unsqueeze(-1), (bs,c,int(hw**0.5), int(hw**0.5))) #  [1, 448, 32, 32]
         
-        return spatial_c_i
+        # Similarity-Based Triplet Loss
+        a = wk_vr[0, :, :]
+        b = wk_vr[1:, :, :]
+        wk_vr_neg = torch.cat((b, a.unsqueeze(0)))
+        alpha_negative = F.softmax(torch.matmul(wq_vs, wk_vr_neg) / self.coef, dim=-1)
+        
+        L_tr = F.relu(-alpha + alpha_negative + self.gamma).mean()
+        
+        return spatial_c_i, L_tr
         
         
 class Decoder(nn.Module):
@@ -261,8 +274,8 @@ class Decoder(nn.Module):
         
 
 if __name__ == '__main__':
-    I_s = torch.randn(1,1,256,256)
-    I_r = torch.randn(1,3,256,256)
+    I_s = torch.randn(2,1,256,256)
+    I_r = torch.randn(2,3,256,256)
     
     G = Generator()
     G(I_r, I_s)
