@@ -24,7 +24,7 @@ class ResidualBlock(nn.Module):
 
 class Generator(nn.Module):
     """Generator network."""
-    def __init__(self, conv_dim=16, d_channel=992, channel_1x1=256):
+    def __init__(self, conv_dim=16, d_channel=448, channel_1x1=256):
         super(Generator, self).__init__()
 
         self.enc_r = Encoder(in_channel=3, conv_dim=conv_dim)
@@ -176,8 +176,8 @@ class Encoder(nn.Module):
         f8 = F.interpolate(f8, scale_factor=f10.size(2)/f8.size(2), mode='nearest') # [1, 128, 32, 32]
         f9 = F.interpolate(f9, scale_factor=f10.size(2)/f9.size(2), mode='nearest') # [1, 256, 32, 32]
         
-        V = torch.cat([f1,f2,f3,f4,f5,f6,f7,f8,f9,f10], dim=1) # Eq.(1) # [1, 992, 32, 32]
-        V_bar = V.view(bs, V.size(1), -1) # [1, 992, 1024]
+        V = torch.cat([f6,f8,f10], dim=1) # Eq.(1) # 64+128+256=448, [1, 448, 32, 32]
+        V_bar = V.view(bs, V.size(1), -1) # [1, 448, 1024]
         
         
         if self.mode == 'E_r':
@@ -186,27 +186,27 @@ class Encoder(nn.Module):
             return V_bar, fs
         
 class SCFT(nn.Module):
-    def __init__(self, d_channel=992):
+    def __init__(self, d_channel=448):
         super(SCFT, self).__init__()
         
-        self.W_v = nn.Parameter(torch.randn(d_channel, d_channel)) # [992, 992]
-        self.W_k = nn.Parameter(torch.randn(d_channel, d_channel)) # [992, 992]
-        self.W_q = nn.Parameter(torch.randn(d_channel, d_channel)) # [992, 992]
+        self.W_v = nn.Parameter(torch.randn(d_channel, d_channel)) # [448, 448]
+        self.W_k = nn.Parameter(torch.randn(d_channel, d_channel)) # [448, 448]
+        self.W_q = nn.Parameter(torch.randn(d_channel, d_channel)) # [448, 448]
         self.coef = d_channel ** .5
     
     def forward(self, V_r, V_s):
         
-        wq_vs = torch.matmul(self.W_q, V_s) # [1, 992, 1024]
-        wk_vr = torch.matmul(self.W_k, V_r).permute(0, 2, 1) # [1, 992, 1024]
+        wq_vs = torch.matmul(self.W_q, V_s) # [1, 448, 1024]
+        wk_vr = torch.matmul(self.W_k, V_r).permute(0, 2, 1) # [1, 448, 1024]
         alpha = F.softmax(torch.matmul(wq_vs, wk_vr) / self.coef, dim=-1) # Eq.(2)
         
         wv_vr = torch.matmul(self.W_v, V_r)
-        v_asta = torch.matmul(alpha, wv_vr) # [1, 992, 1024] # Eq.(3) 
+        v_asta = torch.matmul(alpha, wv_vr) # [1, 448, 1024] # Eq.(3) 
         
-        c_i = V_s + v_asta # [1, 992, 1024] # Eq.(4)
+        c_i = V_s + v_asta # [1, 448, 1024] # Eq.(4)
         
         bs,c,hw = c_i.size()
-        spatial_c_i = torch.reshape(c_i.unsqueeze(-1), (bs,c,int(hw**0.5), int(hw**0.5))) #  [1, 992, 32, 32]
+        spatial_c_i = torch.reshape(c_i.unsqueeze(-1), (bs,c,int(hw**0.5), int(hw**0.5))) #  [1, 448, 32, 32]
         
         return spatial_c_i
         
@@ -239,14 +239,13 @@ class Decoder(nn.Module):
         
         
     def conv_block(self, C_in, C_out, K=3, S=1, P=1, upsample=False):
-        layers = [
-            # nn.ConvTranspose2d(C_in, C_out, kernel_size=K, stride=S, padding=P),
-            spectral_norm(nn.ConvTranspose2d(C_in, C_out, kernel_size=K, stride=S, padding=P)),
+        layers = [spectral_norm(nn.Conv2d(C_in, C_out, kernel_size=K, stride=S, padding=P))]
+        if upsample:
+            layers += [nn.Upsample(scale_factor=2)]
+        layers += [
             nn.InstanceNorm2d(C_out, affine=True),
             nn.LeakyReLU(negative_slope=0.2, inplace=True)
         ]
-        if upsample:
-            layers += [nn.Upsample(scale_factor=2)]
         return nn.Sequential(*layers)
         
     def forward(self, f_encoded, fs):

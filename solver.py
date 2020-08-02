@@ -21,6 +21,18 @@ def weights_init(m):
         nn.init.normal_(m.weight.data, 1.0, 0.02)
         nn.init.constant_(m.bias.data, 0)
 
+def r1_reg(d_out, x_in):
+    # zero-centered gradient penalty for real images
+    batch_size = x_in.size(0)
+    grad_dout = torch.autograd.grad(
+        outputs=d_out.sum(), inputs=x_in,
+        create_graph=True, retain_graph=True, only_inputs=True
+    )[0]
+    grad_dout2 = grad_dout.pow(2)
+    assert(grad_dout2.size() == x_in.size())
+    reg = 0.5 * grad_dout2.view(batch_size, -1).sum(1).mean(0)
+    return reg
+
 class Solver(object):
 
     def __init__(self, data_loader, config):
@@ -48,6 +60,11 @@ class Solver(object):
         self.G = nn.DataParallel(self.G)
         self.D = nn.DataParallel(self.D)
         
+    def adv_loss(self, logits, target):
+        assert target in [1, 0]
+        targets = torch.full_like(logits, fill_value=target)
+        loss = F.binary_cross_entropy_with_logits(logits, targets)
+        return loss
 
     def restore_model(self, resume_iters):
         """Restore the trained generator and discriminator."""
@@ -121,16 +138,21 @@ class Solver(object):
                 # =================================================================================== #
 
                 # Compute loss with real images.
+                I_gt.requires_grad_(requires_grad=True)
                 out = self.D(I_gt)
-                d_loss_real = criterion(out, real_target) * 0.5
+                # d_loss_real = criterion(out, real_target) * 0.5
+                d_loss_real = self.adv_loss(out, 1)
+                d_loss_reg = r1_reg(out, I_gt)
+                
 
                 # Compute loss with fake images.
                 I_fake = self.G(I_r, I_s)
                 out = self.D(I_fake.detach())
-                d_loss_fake = criterion(out, fake_target) * 0.5
+                # d_loss_fake = criterion(out, fake_target) * 0.5
+                d_loss_fake = self.adv_loss(out, 0)
 
                 # Backward and optimize.
-                d_loss = d_loss_real + d_loss_fake
+                d_loss = d_loss_real + d_loss_fake + d_loss_reg
                 self.reset_grad()
                 d_loss.backward()
                 self.d_optimizer.step()
@@ -139,15 +161,17 @@ class Solver(object):
                 loss = {}
                 loss['D/loss_real'] = d_loss_real.item()
                 loss['D/loss_fake'] = d_loss_fake.item()
+                loss['D/loss_reg'] = d_loss_reg.item()
                 
                 # =================================================================================== #
                 #                               3. Train the generator                                #
                 # =================================================================================== #
-                
+                I_gt.requires_grad_(requires_grad=False)
                 # if (i+1) % config.n_critic == 0:
                 I_fake = self.G(I_r, I_s)
                 out = self.D(I_fake)
-                g_loss_fake = criterion(out, real_target)
+                # g_loss_fake = criterion(out, real_target)
+                g_loss_fake = self.adv_loss(out, 1)
                 
                 g_loss_rec = torch.mean(torch.abs(I_fake - I_gt)) # Eq.(6)
 
@@ -187,20 +211,21 @@ class Solver(object):
             # Translate fixed images for debugging.
             if (epoch+1) % config.sample_epoch == 0:
                 with torch.no_grad():
+                    
+                    I_fake_ori = self.G(I_ori, I_s)
+                    I_fake_zero = self.G(torch.zeros(I_ori.size()), I_s)
+                    
                     sample_path = os.path.join(config.sample_dir, '{}.jpg'.format(epoch))
-                    I_concat = self.denorm(torch.cat([I_ori, I_gt, I_r, I_fake], dim=2))
+                    I_concat = self.denorm(torch.cat([I_ori, I_gt, I_r, I_fake, I_fake_ori, I_fake_zero], dim=2))
                     I_concat = torch.cat([I_concat, I_s.repeat(1,3,1,1)], dim=2)
                     save_image(I_concat.data.cpu(), sample_path)
                     print('Saved real and fake images into {}...'.format(sample_path))
 
-            # Save model checkpoints.
-            if (epoch+1) % config.model_save_step == 0:
-                G_path = os.path.join(config.model_save_dir, '{}-G.ckpt'.format(epoch+1))
-                D_path = os.path.join(config.model_save_dir, '{}-D.ckpt'.format(epoch+1))
-                torch.save(self.G.state_dict(), G_path)
-                torch.save(self.D.state_dict(), D_path)
-                print('Saved model checkpoints into {}...'.format(config.model_save_dir))
             
+        G_path = os.path.join(config.model_save_dir, '{}-G.ckpt'.format(epoch+1))
+        torch.save(self.G.state_dict(), G_path)
+        print('Saved model checkpoints into {}...'.format(config.model_save_dir))
+    
 
     def test(self):
         """Translate images using StarGAN trained on a single dataset."""

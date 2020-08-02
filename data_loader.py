@@ -77,7 +77,9 @@ class Dataset(data.Dataset):
         line = self.transform_line(line)
         
         if random.random() <= 0.9:
-            I_r = TPS(I_gt)
+            # I_r = TPS(I_gt)
+            # I_r = TPS(I_gt.unsqueeze(0)).squeeze()
+            I_r = I_gt.clone()
         else:
             I_r = torch.zeros(I_gt.size())
 
@@ -87,37 +89,37 @@ class Dataset(data.Dataset):
     def __len__(self):
         return len(self.ids)
 
-def TPS(x):
-    c,h,w = x.size()
-    x = x.numpy()
-    common = np.random.rand(4, 2)
-    A = np.random.rand(2, 2)
-    B = np.random.rand(2, 2)
-    c_src = np.concatenate([common, A], 0)
-    c_dst = np.concatenate([common, B], 0)
-    warped = warp_image_cv(x.transpose(2, 1, 0), c_src, c_dst, dshape=(h, w)).transpose((2, 0, 1)) # HWC -> CHW
-    return torch.from_numpy(warped)
-
-
 # def TPS(x):
+#     c,h,w = x.size()
+#     x = x.numpy()
+#     common = np.random.rand(4, 2)
+#     A = np.random.rand(2, 2)
+#     B = np.random.rand(2, 2)
+#     c_src = np.concatenate([common, A], 0)
+#     c_dst = np.concatenate([common, B], 0)
+#     warped = warp_image_cv(x.transpose(2, 1, 0), c_src, c_dst, dshape=(h, w)).transpose((2, 0, 1)) # HWC -> CHW
+#     return torch.from_numpy(warped)
+
+
+def TPS(x):
     
-#     def affine_transform(x, theta):
-#         theta = theta.view(-1, 2, 3)
-#         # grid = F.affine_grid(theta, x.size(), align_corners=True)
-#         # x = F.grid_sample(x, grid, align_corners=True)
-#         grid = F.affine_grid(theta, x.size())
-#         x = F.grid_sample(x, grid)
-#         return x
+    def affine_transform(x, theta):
+        theta = theta.view(-1, 2, 3)
+        # grid = F.affine_grid(theta, x.size(), align_corners=True)
+        # x = F.grid_sample(x, grid, align_corners=True)
+        grid = F.affine_grid(theta, x.size())
+        x = F.grid_sample(x, grid)
+        return x
     
-#     theta1 = np.zeros(9)
-#     theta1[0:6] = np.random.randn(6) * 0.15
-#     theta1 = theta1 + np.array([1,0,0,0,1,0,0,0,1])
-#     affine1 = np.reshape(theta1, (3,3))
-#     affine1 = np.reshape(affine1, -1)[0:6]
-#     affine1 = torch.from_numpy(affine1).type(torch.FloatTensor)
-#     x = affine_transform(x, affine1) # source image
+    theta1 = np.zeros(9)
+    theta1[0:6] = np.random.randn(6) * 0.15
+    theta1 = theta1 + np.array([1,0,0,0,1,0,0,0,1])
+    affine1 = np.reshape(theta1, (3,3))
+    affine1 = np.reshape(affine1, -1)[0:6]
+    affine1 = torch.from_numpy(affine1).type(torch.FloatTensor)
+    x = affine_transform(x, affine1) # source image
     
-#     return x
+    return x
 
 
 def get_loader(crop_size=256, image_size=266, batch_size=16, dataset='CelebA', mode='train', num_workers=8, line_type='xdog', ROOT='./datasets'):
@@ -139,7 +141,8 @@ def get_loader(crop_size=256, image_size=266, batch_size=16, dataset='CelebA', m
     transform_line = T.Compose([
         T.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
         T.Resize((crop_size, crop_size), interpolation=Image.LANCZOS),
-        T.ToTensor()
+        T.ToTensor(),
+        # T.RandomErasing(p=0.9, value=1., scale=(0.02, 0.1))
     ])
     
     transform_original = T.Compose([

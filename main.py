@@ -39,7 +39,7 @@ if __name__ == '__main__':
     parser.add_argument('--image_size', type=int, default=276, help='image resolution')
     parser.add_argument('--g_conv_dim', type=int, default=16, help='number of conv filters in the first layer of G')
     parser.add_argument('--d_conv_dim', type=int, default=64, help='number of conv filters in the first layer of D')
-    parser.add_argument('--d_channel', type=int, default=992)
+    parser.add_argument('--d_channel', type=int, default=448)
     parser.add_argument('--channel_1x1', type=int, default=256)
     parser.add_argument('--d_repeat_num', type=int, default=6, help='number of strided conv layers in D')
     parser.add_argument('--lambda_rec', type=float, default=30, help='weight for reconstruction loss')
@@ -51,12 +51,12 @@ if __name__ == '__main__':
     # Training configuration.
     parser.add_argument('--dataset', type=str, default='line_art') # , choices=['line_art, tag2pix']
     parser.add_argument('--line_type', type=str, default='xdog') # , choices=['xdog, keras']
-    parser.add_argument('--batch_size', type=int, default=16, help='mini-batch size')
+    parser.add_argument('--batch_size', type=int, default=32, help='mini-batch size')
     parser.add_argument('--num_epoch', type=int, default=200, help='number of total iterations for training D')
     parser.add_argument('--num_epoch_decay', type=int, default=100, help='number of iterations for decaying lr')
     parser.add_argument('--g_lr', type=float, default=0.0002, help='learning rate for G')
     parser.add_argument('--d_lr', type=float, default=0.0002, help='learning rate for D')
-    parser.add_argument('--n_critic', type=int, default=5, help='number of D updates per each G update')
+    parser.add_argument('--n_critic', type=int, default=1, help='number of D updates per each G update')
     parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for Adam optimizer')
     parser.add_argument('--beta2', type=float, default=0.999, help='beta2 for Adam optimizer')
 
@@ -78,7 +78,7 @@ if __name__ == '__main__':
 
     config = parser.parse_args()
     config.log_dir = os.path.join(config.result_dir, config.exp_name, 'log')
-    config.sample_dir = os.path.join(config.result_dir, config.exp_name, 'sample')
+    config.sample_dir = os.path.join(config.result_dir, config.exp_name, config.exp_name)
     config.model_save_dir = os.path.join(config.result_dir, config.exp_name, 'model')
     print(config)
     main(config)
