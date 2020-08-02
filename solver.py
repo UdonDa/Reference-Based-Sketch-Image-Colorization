@@ -10,6 +10,9 @@ import time
 import datetime
 from sys import exit
 
+from vgg import VGG16FeatureExtractor
+from loss import 
+
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
