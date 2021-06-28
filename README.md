@@ -17,6 +17,10 @@ https://openaccess.thecvf.com/content_CVPR_2020/papers/Lee_Reference-Based_Sketc
 # LICENCE
 All code is licensed under the MIT license.
 
+# RELATED WORKS
++ Re-implementation: https://github.com/SerialLain3170/Colorization/tree/master/scft  
++ https://github.com/MarkMoHR/Awesome-Image-Colorization
+
 # Acknowledgements
 This repository is based on https://github.com/yunjey/stargan.
 
